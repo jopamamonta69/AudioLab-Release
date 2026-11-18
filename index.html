@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AudioLab — Анализатор спектра и суббаса</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            border-bottom: 1px solid #2a2a2a;
+            padding-bottom: 12px;
+        }
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #ffffff;
+            letter-spacing: 0.5px;
+        }
+        .tabs {
+            display: flex;
+            gap: 8px;
+        }
+        .tab-btn {
+            background: #1e1e1e;
+            color: #aaa;
+            border: 1px solid #333;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #ff2a5f;
+            color: #fff;
+            border-color: #ff2a5f;
+        }
+        .panel {
+            background: #181818;
+            border: 1px solid #2c2c2c;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        button, .file-label {
+            background: #252525;
+            color: #fff;
+            border: 1px solid #3a3a3a;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+        button:hover, .file-label:hover {
+            background: #333;
+        }
+        button.primary {
+            background: #ff2a5f;
+            border-color: #ff2a5f;
+        }
+        button.primary:hover {
+            background: #e02050;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        input[type="text"] {
+            flex: 1;
+            min-width: 220px;
+            background: #121212;
+            color: #fff;
+            border: 1px solid #383838;
+            padding: 9px 14px;
+            border-radius: 8px;
+            outline: none;
+        }
+        input[type="text"]:focus {
+            border-color: #ff2a5f;
+        }
+        audio {
+            width: 100%;
+            height: 40px;
+            border-radius: 8px;
+            outline: none;
+        }
+        .sc-results {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .sc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #202020;
+            border: 1px solid #2e2e2e;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.15s;
+        }
+        .sc-item:hover {
+            border-color: #ff2a5f;
+            background: #261b1f;
+        }
+        .eq-panel {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            border-radius: 10px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .eq-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .eq-bands {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            text-align: center;
+        }
+        .eq-band {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1c1c1c;
+            padding: 8px 4px;
+            border-radius: 8px;
+            border: 1px solid #282828;
+        }
+        .eq-band label {
+            font-size: 0.78rem;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+        .eq-band span {
+            font-size: 0.75rem;
+            color: #ff2a5f;
+            font-weight: 600;
+            margin-top: 6px;
+        }
+        .eq-band input[type="range"] {
+            writing-mode: vertical-lr;
+            direction: rtl;
+            width: 24px;
+            height: 85px;
+            cursor: pointer;
+            accent-color: #ff2a5f;
+        }
+        .canvas-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .canvas-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #999;
+        }
+        .peak-badge {
+            color: #ff2a5f;
+            font-weight: 600;
+        }
+        canvas {
+            width: 100%;
+            height: 190px;
+            background: #0d0d0d;
+            border: 1px solid #333;
+            border-radius: 12px;
+            display: block;
+            transition: border-color 0.08s ease-out;
+        }
+        #mainCanvas {
+            box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+        }
+        #bassCanvas {
+            height: 175px;
+            box-shadow: 0 0 20px rgba(255, 42, 95, 0.12);
+        }
+        .hidden {
+            display: none !important;
+        }
+        .gen-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .gen-controls input[type="range"] {
+            width: 100%;
+            accent-color: #ff2a5f;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>AudioLab // Spectrum & Sub-Bass</h1>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('analyzer')">Анализатор</button>
+            <button class="tab-btn" onclick="switchTab('generator')">Генератор частот</button>
+        </div>
+    </header>
+
+    <!-- ВКЛАДКА АНАЛИЗАТОРА -->
+    <div id="analyzerTab" class="panel">
+        <div class="controls-row">
+            <label class="file-label">
+                Выбрать файл (MP3/M4A/FLAC)
+                <input type="file" id="fileInput" accept="audio/*">
+            </label>
+            <button id="micBtn">Включить микрофон</button>
+            <span id="statusText" style="font-size: 0.85rem; color: #888;">Готов к работе</span>
+        </div>
+
+        <!-- Поиск через локальный Rust-сервер SoundCloud -->
+        <div class="controls-row">
+            <input type="text" id="scQuery" placeholder="Поиск в SoundCloud (например: ШИПЫ, ONDA ANDAR)...">
+            <button id="scSearchBtn" class="primary">Найти в SC</button>
+        </div>
+        <div id="scResults" class="sc-results"></div>
+
+        <audio id="audioPlayer" controls crossorigin="anonymous"></audio>
+
+        <!-- Встроенный эквалайзер -->
+        <div class="eq-panel">
+            <div class="eq-header">
+                <span style="font-size: 0.9rem; font-weight: 600; color: #fff;">Эквалайзер (Web Audio DSP)</span>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                    <button type="button" id="eqBypassBtn" onclick="toggleEqBypass()" style="padding: 4px 10px; font-size: 0.8rem; border-color: #ff2a5f; color: #ff2a5f;">Эквалайзер: ВКЛ</button>
+                    <button type="button" onclick="applyBassPreset()" class="primary" style="padding: 4px 10px; font-size: 0.8rem;">Мой Бас (+5.5 дБ @ 34 Гц)</button>
+                    <button type="button" onclick="resetEq()" style="padding: 4px 10px; font-size: 0.8rem;">Сброс (0 дБ)</button>
+                </div>
+            </div>
+            <div class="eq-bands">
+                <div class="eq-band">
+                    <label>Preamp</label>
+                    <input type="range" id="eqPreamp" min="-18" max="6" step="0.5" value="0">
+                    <span id="valPreamp">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>34 Гц</label>
+                    <input type="range" class="eq-slider" data-idx="0" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>60 Гц</label>
+                    <input type="range" class="eq-slider" data-idx="1" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>150 Гц</label>
+                    <input type="range" class="eq-slider" data-idx="2" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>1 кГц</label>
+                    <input type="range" class="eq-slider" data-idx="3" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>4 кГц</label>
+                    <input type="range" class="eq-slider" data-idx="4" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+                <div class="eq-band">
+                    <label>12 кГц</label>
+                    <input type="range" class="eq-slider" data-idx="5" min="-12" max="12" step="0.5" value="0">
+                    <span class="eq-val">0 дБ</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Верхний график: полный спектр -->
+        <div class="canvas-box">
+            <div class="canvas-header">
+                <span>Полный спектр (20 Гц – 20 кГц)</span>
+                <span id="mainPeak" class="peak-badge">Пик: — Гц</span>
+            </div>
+            <canvas id="mainCanvas" width="960" height="190"></canvas>
+        </div>
+
+        <!-- Нижний график: суббас 1-80 Гц -->
+        <div class="canvas-box">
+            <div class="canvas-header">
+                <span>Шкала суббаса (1 – 80 Гц)</span>
+                <span id="subPeak" class="peak-badge">Суб-пик: — Гц</span>
+            </div>
+            <canvas id="bassCanvas" width="960" height="175"></canvas>
+        </div>
+    </div>
+
+    <!-- ВКЛАДКА ГЕНЕРАТОРА ЧАСТОТ -->
+    <div id="generatorTab" class="panel hidden">
+        <div class="gen-controls">
+            <div style="display: flex; justify-content: space-between;">
+                <span>Частота: <b id="freqVal" style="color:#ff2a5f;">40 Гц</b></span>
+                <span>Громкость: <b id="volVal">20%</b></span>
+            </div>
+            <input type="range" id="freqSlider" min="15" max="200" value="40" step="1">
+            <input type="range" id="volSlider" min="0" max="100" value="20">
+            <div class="controls-row">
+                <button id="genToggleBtn" class="primary">Запустить синус</button>
+                <button onclick="setPresetFreq(25)">25 Гц</button>
+                <button onclick="setPresetFreq(34)">34 Гц</button>
+                <button onclick="setPresetFreq(50)">50 Гц</button>
+                <button onclick="setPresetFreq(80)">80 Гц</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    let audioCtx = null;
+    let analyser = null;
+    let mediaSource = null;
+    let preampNode = null;
+    let eqFilters = new Array();
+    let isPlayerConnected = false;
+    let micStream = null;
+    let micSource = null;
+    let animationId = null;
+
+    const audioPlayer = document.getElementById('audioPlayer');
+    const fileInput = document.getElementById('fileInput');
+    const micBtn = document.getElementById('micBtn');
+    const statusText = document.getElementById('statusText');
+
+    const mainCanvas = document.getElementById('mainCanvas');
+    const mainCtx = mainCanvas.getContext('2d');
+    const bassCanvas = document.getElementById('bassCanvas');
+    const bassCtx = bassCanvas.getContext('2d');
+
+    const mainPeakEl = document.getElementById('mainPeak');
+    const subPeakEl = document.getElementById('subPeak');
+
+    const eqConfig = new Array(
+        { freq: 55, type: 'lowshelf', q: 0.7 },
+        { freq: 85, type: 'peaking', q: 0.9 },
+        { freq: 150, type: 'peaking', q: 1.0 },
+        { freq: 1000, type: 'peaking', q: 1.0 },
+        { freq: 4000, type: 'peaking', q: 1.0 },
+        { freq: 12000, type: 'highshelf', q: 0.7 }
+    );
+
+    function initAudioContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 8192;
+            analyser.smoothingTimeConstant = 0.8;
+
+            preampNode = audioCtx.createGain();
+            preampNode.gain.value = 1.0;
+
+            eqFilters = eqConfig.map(cfg => {
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = cfg.type;
+                filter.frequency.value = cfg.freq;
+                filter.Q.value = cfg.q;
+                filter.gain.value = 0;
+                return filter;
+            });
+
+            let prevNode = preampNode;
+            eqFilters.forEach(f => {
+                prevNode.connect(f);
+                prevNode = f;
+            });
+            prevNode.connect(analyser);
+            analyser.connect(audioCtx.destination);
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function connectPlayer() {
+        initAudioContext();
+        if (micSource) {
+            try { micSource.disconnect(); } catch (e) {}
+        }
+        if (!isPlayerConnected) {
+            mediaSource = audioCtx.createMediaElementSource(audioPlayer);
+            mediaSource.connect(preampNode);
+            isPlayerConnected = true;
+        }
+        startLoop();
+    }
+
+    // Управление эквалайзером
+    const eqPreampSlider = document.getElementById('eqPreamp');
+    const valPreamp = document.getElementById('valPreamp');
+    const eqSliders = document.querySelectorAll('.eq-slider');
+    const eqVals = document.querySelectorAll('.eq-val');
+
+    eqPreampSlider.addEventListener('input', () => {
+        const db = parseFloat(eqPreampSlider.value);
+        valPreamp.textContent = `${db > 0 ? '+' : ''}${db} дБ`;
+        if (preampNode) {
+            preampNode.gain.setValueAtTime(Math.pow(10, db / 20), audioCtx.currentTime);
+        }
+    });
+
+    eqSliders.forEach(slider => {
+        slider.addEventListener('input', () => {
+            const idx = Number(slider.dataset.idx);
+            const db = parseFloat(slider.value);
+            eqVals.item(idx).textContent = `${db > 0 ? '+' : ''}${db} дБ`;
+            if (eqFilters.at(idx)) {
+                eqFilters.at(idx).gain.setValueAtTime(db, audioCtx.currentTime);
+            }
+        });
+    });
+
+    function setEqValues(preampDb, bandsArray) {
+        initAudioContext();
+        eqPreampSlider.value = preampDb;
+        valPreamp.textContent = `${preampDb > 0 ? '+' : ''}${preampDb} дБ`;
+        preampNode.gain.setValueAtTime(Math.pow(10, preampDb / 20), audioCtx.currentTime);
+
+        bandsArray.forEach((db, idx) => {
+            eqSliders.item(idx).value = db;
+            eqVals.item(idx).textContent = `${db > 0 ? '+' : ''}${db} дБ`;
+            eqFilters.at(idx).gain.setValueAtTime(db, audioCtx.currentTime);
+        });
+    }
+
+    function applyBassPreset() {
+        setEqValues(-6.0, new Array(5.5, 3.5, 0.0, -1.0, -2.5, 0.5));
+    }
+
+    function resetEq() {
+        setEqValues(0, new Array(0, 0, 0, 0, 0, 0));
+    }
+    let isEqBypassed = false;
+
+    function toggleEqBypass() {
+        initAudioContext();
+        isEqBypassed = !isEqBypassed;
+        const btn = document.getElementById('eqBypassBtn');
+        const bandsBox = document.querySelector('.eq-bands');
+
+        if (isEqBypassed) {
+            // Полностью отключаем эквалайзер и пускаем сигнал в обход (Bypass)
+            preampNode.gain.setValueAtTime(1.0, audioCtx.currentTime);
+            eqFilters.forEach(f => f.gain.setValueAtTime(0, audioCtx.currentTime));
+
+            btn.textContent = 'Эквалайзер: ВЫКЛ (Bypass)';
+            btn.style.borderColor = '#555';
+            btn.style.color = '#888';
+            bandsBox.style.opacity = '0.4';
+            bandsBox.style.pointerEvents = 'none';
+        } else {
+            // Возвращаем выставленные на ползунках значения обратно
+            const preampDb = parseFloat(eqPreampSlider.value);
+            preampNode.gain.setValueAtTime(Math.pow(10, preampDb / 20), audioCtx.currentTime);
+            eqSliders.forEach((slider, idx) => {
+                eqFilters.at(idx).gain.setValueAtTime(parseFloat(slider.value), audioCtx.currentTime);
+            });
+
+            btn.textContent = 'Эквалайзер: ВКЛ';
+            btn.style.borderColor = '#ff2a5f';
+            btn.style.color = '#ff2a5f';
+            bandsBox.style.opacity = '1';
+            bandsBox.style.pointerEvents = 'auto';
+        }
+    }
+
+    // Загрузка локального файла
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files.item(0);
+        if (!file) return;
+        stopMic();
+        const url = URL.createObjectURL(file);
+        audioPlayer.src = url;
+        statusText.textContent = `Файл: ${file.name}`;
+        connectPlayer();
+        audioPlayer.play();
+    });
+
+    audioPlayer.addEventListener('play', () => {
+        stopMic();
+        connectPlayer();
+    });
+
+    // Микрофон
+    micBtn.addEventListener('click', async () => {
+        if (micStream) {
+            stopMic();
+            return;
+        }
+        try {
+            audioPlayer.pause();
+            initAudioContext();
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
+            micSource = audioCtx.createMediaStreamSource(micStream);
+            micSource.connect(analyser);
+            micBtn.textContent = 'Отключить микрофон';
+            micBtn.classList.add('primary');
+            statusText.textContent = 'Активен микрофон';
+            startLoop();
+        } catch (err) {
+            statusText.textContent = 'Ошибка доступа к микрофону';
+        }
+    });
+
+    function stopMic() {
+        if (micStream) {
+            micStream.getTracks().forEach(t => t.stop());
+            micStream = null;
+            micBtn.textContent = 'Включить микрофон';
+            micBtn.classList.remove('primary');
+        }
+    }
+
+    // Поиск треков в SoundCloud
+    const scQuery = document.getElementById('scQuery');
+    const scSearchBtn = document.getElementById('scSearchBtn');
+    const scResults = document.getElementById('scResults');
+
+    async function searchSoundCloud() {
+        const q = scQuery.value.trim();
+        if (!q) return;
+        scResults.innerHTML = '<div style="color:#888; font-size:0.85rem;">Ищем в SoundCloud...</div>';
+
+        try {
+            const res = await fetch('/search?q=' + encodeURIComponent(q));
+            const tracks = await res.json();
+            scResults.innerHTML = '';
+
+            if (!tracks.length) {
+                scResults.innerHTML = '<div style="color:#888; font-size:0.85rem;">Ничего не найдено</div>';
+                return;
+            }
+
+            tracks.forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'sc-item';
+                const mins = Math.floor(t.duration / 60);
+                const secs = Math.floor(t.duration % 60).toString().padStart(2, '0');
+                item.innerHTML = `<span><b>${t.uploader}</b> — ${t.title}</span><span style="color:#888; font-size:0.85rem;">${mins}:${secs}</span>`;
+
+                item.onclick = () => {
+                    stopMic();
+                    statusText.textContent = `Загрузка: ${t.title}...`;
+                    audioPlayer.src = '/stream?url=' + encodeURIComponent(t.url);
+                    connectPlayer();
+                    audioPlayer.play().then(() => {
+                        statusText.textContent = `SC: ${t.uploader} — ${t.title}`;
+                    }).catch(() => {
+                        statusText.textContent = 'Ошибка воспроизведения потока';
+                    });
+                };
+                scResults.appendChild(item);
+            });
+        } catch (err) {
+            scResults.innerHTML = '<div style="color:#ff2a5f; font-size:0.85rem;">Сервер Rust не запущен (запусти cargo run)</div>';
+        }
+    }
+
+    scSearchBtn.addEventListener('click', searchSoundCloud);
+    scQuery.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') searchSoundCloud();
+    });
+    function startLoop() {
+        if (animationId) cancelAnimationFrame(animationId);
+        const bufferLength = analyser.frequencyBinCount;
+        const freqData = new Uint8Array(bufferLength);
+        const sampleRate = audioCtx.sampleRate;
+        const binWidth = sampleRate / analyser.fftSize;
+        const gridFreqs = new Array(20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000);
+
+        function draw() {
+            animationId = requestAnimationFrame(draw);
+            analyser.getByteFrequencyData(freqData);
+
+            // --- 1. ВЕРХНИЙ ГРАФИК (20 Гц - 20 кГц) ---
+            const w1 = mainCanvas.width;
+            const h1 = mainCanvas.height;
+            mainCtx.fillStyle = '#0d0d0d';
+            mainCtx.fillRect(0, 0, w1, h1);
+
+            mainCtx.strokeStyle = '#1f1f1f';
+            mainCtx.fillStyle = '#555';
+            mainCtx.font = '11px sans-serif';
+            gridFreqs.forEach(f => {
+                const x = (Math.log10(f / 20) / Math.log10(20000 / 20)) * w1;
+                mainCtx.beginPath();
+                mainCtx.moveTo(x, 0);
+                mainCtx.lineTo(x, h1);
+                mainCtx.stroke();
+                mainCtx.fillText(f >= 1000 ? (f / 1000) + 'k' : f, x + 3, h1 - 6);
+            });
+
+            let maxMainVal = 0;
+            let maxMainFreq = 0;
+
+            const grad1 = mainCtx.createLinearGradient(0, 0, 0, h1);
+            grad1.addColorStop(0, 'rgba(0, 210, 255, 0.5)');
+            grad1.addColorStop(1, 'rgba(0, 210, 255, 0.0)');
+
+            mainCtx.beginPath();
+            mainCtx.moveTo(0, h1);
+
+            for (let x = 0; x < w1; x++) {
+                const freq = 20 * Math.pow(20000 / 20, x / w1);
+                const bin = Math.min(bufferLength - 1, Math.round(freq / binWidth));
+                const val = freqData.at(bin);
+                if (val > maxMainVal) {
+                    maxMainVal = val;
+                    maxMainFreq = Math.round(freq);
+                }
+                const y = h1 - (val / 255) * (h1 - 16);
+                mainCtx.lineTo(x, y);
+            }
+            mainCtx.lineTo(w1, h1);
+            mainCtx.closePath();
+            mainCtx.fillStyle = grad1;
+            mainCtx.fill();
+
+            mainCtx.strokeStyle = '#00d2ff';
+            mainCtx.lineWidth = 2;
+            mainCtx.stroke();
+
+            mainPeakEl.textContent = maxMainVal > 10 ? `Пик: ${maxMainFreq} Гц` : 'Пик: — Гц';
+
+            // --- 2. НИЖНИЙ ГРАФИК СУББАСА (1 - 80 Гц) ---
+            const w2 = bassCanvas.width;
+            const h2 = bassCanvas.height;
+            bassCtx.fillStyle = '#0d0d0d';
+            bassCtx.fillRect(0, 0, w2, h2);
+
+            bassCtx.strokeStyle = '#1f1f1f';
+            bassCtx.fillStyle = '#666';
+            bassCtx.font = '11px sans-serif';
+            for (let f = 10; f <= 70; f += 10) {
+                const x = ((f - 1) / 79) * w2;
+                bassCtx.beginPath();
+                bassCtx.moveTo(x, 0);
+                bassCtx.lineTo(x, h2);
+                bassCtx.stroke();
+                bassCtx.fillText(f + ' Гц', x + 4, h2 - 6);
+            }
+
+            const maxBin = Math.min(bufferLength - 1, Math.ceil(80 / binWidth));
+            let maxSubVal = 0;
+            let maxSubFreq = 0;
+
+            const grad2 = bassCtx.createLinearGradient(0, 0, 0, h2);
+            grad2.addColorStop(0, 'rgba(255, 42, 95, 0.55)');
+            grad2.addColorStop(1, 'rgba(255, 42, 95, 0.0)');
+
+            bassCtx.beginPath();
+            bassCtx.moveTo(0, h2);
+
+            for (let i = 1; i <= maxBin; i++) {
+                const freq = i * binWidth;
+                if (freq > 80) break;
+                const val = freqData.at(i);
+                if (val > maxSubVal && freq >= 10) {
+                    maxSubVal = val;
+                    maxSubFreq = Math.round(freq);
+                }
+                const x = ((freq - 1) / 79) * w2;
+                const y = h2 - (val / 255) * (h2 - 16);
+                bassCtx.lineTo(x, y);
+            }
+            bassCtx.lineTo(w2, h2);
+            bassCtx.closePath();
+            bassCtx.fillStyle = grad2;
+            bassCtx.fill();
+
+            bassCtx.strokeStyle = '#ff2a5f';
+            bassCtx.lineWidth = 2.5;
+            bassCtx.stroke();
+
+            subPeakEl.textContent = maxSubVal > 15 ? `Суб-пик: ${maxSubFreq} Гц` : 'Суб-пик: — Гц';
+
+            // Динамическая пульсация рамки суббаса
+            const intensity = maxSubVal / 255.0;
+            const glowSize = 15 + Math.round(intensity * 32);
+            const glowAlpha = (0.12 + intensity * 0.65).toFixed(2);
+            bassCanvas.style.boxShadow = `0 0 ${glowSize}px rgba(255, 42, 95, ${glowAlpha})`;
+            bassCanvas.style.borderColor = intensity > 0.72 ? '#ff2a5f' : '#333';
+        }
+        draw();
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+            btn.classList.toggle('active', (tab === 'analyzer' && idx === 0) || (tab === 'generator' && idx === 1));
+        });
+        document.getElementById('analyzerTab').classList.toggle('hidden', tab !== 'analyzer');
+        document.getElementById('generatorTab').classList.toggle('hidden', tab !== 'generator');
+    }
+
+    let osc = null;
+    let gainNode = null;
+    const freqSlider = document.getElementById('freqSlider');
+    const volSlider = document.getElementById('volSlider');
+    const freqVal = document.getElementById('freqVal');
+    const volVal = document.getElementById('volVal');
+    const genToggleBtn = document.getElementById('genToggleBtn');
+
+    freqSlider.addEventListener('input', () => {
+        freqVal.textContent = `${freqSlider.value} Гц`;
+        if (osc) osc.frequency.setValueAtTime(Number(freqSlider.value), audioCtx.currentTime);
+    });
+
+    volSlider.addEventListener('input', () => {
+        volVal.textContent = `${volSlider.value}%`;
+        if (gainNode) gainNode.gain.setValueAtTime((Number(volSlider.value) / 100) * 0.5, audioCtx.currentTime);
+    });
+
+    function setPresetFreq(f) {
+        freqSlider.value = f;
+        freqVal.textContent = `${f} Гц`;
+        if (osc) osc.frequency.setValueAtTime(f, audioCtx.currentTime);
+    }
+
+    genToggleBtn.addEventListener('click', () => {
+        if (osc) {
+            osc.stop();
+            osc.disconnect();
+            osc = null;
+            genToggleBtn.textContent = 'Запустить синус';
+            return;
+        }
+        initAudioContext();
+        osc = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(Number(freqSlider.value), audioCtx.currentTime);
+        gainNode.gain.setValueAtTime((Number(volSlider.value) / 100) * 0.5, audioCtx.currentTime);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        genToggleBtn.textContent = 'Остановить синус';
+    });
+</script>
+</body>
+</html>
